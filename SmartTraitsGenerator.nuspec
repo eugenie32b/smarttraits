@@ -1,0 +1,24 @@
+﻿<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata>
+    <id>SmartTraits</id>
+    <version>0.1.0</version>
+    <authors>SmartTraits</authors>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>Add traits-like capabilities to C# language</description>
+
+  </metadata>
+
+  
+
+  <files>
+
+    <file src="SmartTraitsDefs\bin\Debug\netstandard2.0\*.dll" target="lib/netstandard2.0" />
+    <file src="SmartTraitsDefs\bin\Debug\netstandard2.0\*.pdb" target="lib/netstandard2.0" />
+
+    <file src="SmartTraits\bin\Debug\netstandard2.0\SmartTraits.dll" target="analyzers/dotnet/cs" />
+    <file src="SmartTraits\bin\Debug\netstandard2.0\SmartTraits.pdb" target="analyzers/dotnet/cs" />
+
+
+  </files>
+</package>

@@ -1,0 +1,528 @@
+﻿<#@ assembly name="System.Core.dll" #>
+<#@ assembly name="System.dll" #>
+<#@ assembly name="System.Text.Json.dll" #>
+<#@ assembly name="System.Text.RegularExpressions.dll" #>
+<#@ assembly name="System.CodeDom.dll" #>
+
+<#@ assembly name="System.Memory.dll" #>
+<#@ assembly name="System.Linq.Expressions.dll" #>
+<#@ assembly name="System.Xml.dll" #>
+<#@ assembly name="Microsoft.CSharp.dll" #>
+<#@ assembly name="Microsoft.CodeAnalysis.dll" #>
+<#@ assembly name="Microsoft.CodeAnalysis.CSharp.dll" #>
+<#@ assembly name="UniWalker.dll" #>
+
+<#@ import namespace="System.Collections.Generic" #>
+<#@ import namespace="System.Linq" #>
+<#@ import namespace="System.Text.Json" #>
+<#@ import namespace="System.Text.RegularExpressions" #>
+<#@ import namespace="System.Xml" #>
+<#@ import namespace="Microsoft.CodeAnalysis" #>
+<#@ import namespace="Microsoft.CodeAnalysis.CSharp" #>
+<#@ import namespace="Microsoft.CodeAnalysis.CSharp.Syntax" #>
+<#@ import namespace="System.Runtime.CompilerServices" #>
+
+
+<#@ template language="C#" #>
+
+<#@ parameter name="FileName" type="System.String" #>
+<#@ parameter name="FilePath" type="System.String" #>
+<#@ parameter name="FileSha256" type="System.String" #>
+<#@ parameter name="User" type="System.String" #>
+<#@ parameter name="MachineName" type="System.String" #>
+<#@ parameter name="Now" type="System.String" #>
+
+<#@ parameter name="AppliedTo" type="System.String" #>
+
+<#@ parameter name="ExtraTag" type="System.String" #>
+<#@ parameter name="GlobalTag" type="System.Collections.Generic.Dictionary<string, string>" #>
+
+<#@ parameter name="FileNameMarker" type="System.String" #>
+
+<#@ parameter name="RequiredUsing" type="System.Collections.Generic.List<string>" #>
+<#@ parameter name="ClassNode" type="Microsoft.CodeAnalysis.CSharp.Syntax.ClassDeclarationSyntax" #>
+<#@ parameter name="MethodNode" type="Microsoft.CodeAnalysis.CSharp.Syntax.MethodDeclarationSyntax" #>
+<#@ parameter name="PropertyNode" type="Microsoft.CodeAnalysis.CSharp.Syntax.PropertyDeclarationSyntax" #>
+<#@ parameter name="StatementNode" type="Microsoft.CodeAnalysis.CSharp.Syntax.StatementSyntax" #>
+<#@ parameter name="SyntaxNode" type="Microsoft.CodeAnalysis.CSharp.CSharpSyntaxNode" #>
+
+<#@ parameter name="Log" type="Action<System.String>" #>
+<#@ parameter name="LogError" type="Action<System.String>" #>
+<#@ parameter name="LogDebug" type="Action<System.String>" #>
+
+<#+
+
+public string MethodName => MethodNode.Identifier.ToFullString();
+
+public string StatementBody()
+{
+	return StatementNode.ToFullString();
+}
+
+public string MethodStart() { 
+	return MethodNode.AttributeLists.ToFullString() + 
+		MethodNode.Modifiers.ToFullString() + 
+		MethodNode.ReturnType.ToFullString() + 
+		MethodNode.Identifier.ToFullString() + 
+		MethodNode.ParameterList.ToFullString() + 
+		MethodNode.Body.OpenBraceToken.ToFullString();
+}
+
+public string MethodBody() { 
+	return MethodNode.Body.Statements.ToFullString();
+}
+
+public string MethodEnd() { 
+	return MethodNode.Body.CloseBraceToken.ToFullString();
+}
+
+public string ClassStart(ClassDeclarationSyntax classNode = null) { 
+	if(classNode == null)
+		classNode = ClassNode;
+
+	return classNode.AttributeLists.ToFullString() + 
+	classNode.Modifiers.ToFullString() + 
+	classNode.Keyword.ToFullString() + 
+	classNode.Identifier.ToFullString() + 
+	classNode.BaseList.ToFullString() + 
+	classNode.OpenBraceToken.ToFullString();
+}
+
+public string ClassBody(ClassDeclarationSyntax classNode = null) { 
+	if(classNode == null)
+		classNode = ClassNode;
+
+	return classNode.Members.ToFullString();
+}
+
+public string ClassEnd(ClassDeclarationSyntax classNode = null) { 
+	if(classNode == null)
+		classNode = ClassNode;
+
+	return classNode.CloseBraceToken.ToFullString();
+}
+
+public string PropertyDefinition() 
+{
+	return PropertyNode.AttributeLists.ToFullString() +
+			PropertyNode.Modifiers.ToFullString() +
+			PropertyNode.Type.ToFullString() +
+			PropertyNode.Identifier.ToFullString();
+}
+
+public string PropertyGetBlock() 
+{ 
+	var getAccessor = PropertyNode.AccessorList?.Accessors.FirstOrDefault(w => w.Keyword.ToString() == "get");
+	if(getAccessor == null)
+		return null;
+
+	if(getAccessor.ExpressionBody != null)
+		return getAccessor.ExpressionBody.Expression.ToFullString() + ";";
+	
+	return getAccessor?.Body.Statements.ToFullString();
+}
+
+public string PropertySetBlock() 
+{ 
+	var setAccessor = PropertyNode.AccessorList?.Accessors.FirstOrDefault(w => w.Keyword.ToString() == "set");
+	if(setAccessor == null)
+		return null;
+
+	if(setAccessor.ExpressionBody != null)
+		return setAccessor.ExpressionBody.Expression.ToFullString() + ";";
+	
+	return setAccessor?.Body.Statements.ToFullString();
+}
+
+public bool PropertyHasEmptyGetBlock() {
+	return PropertyNode.AccessorList != null && PropertyNode.AccessorList.Accessors.Any(w => w.ExpressionBody == null && w.Body == null && w.Keyword.ToString() == "get");
+}
+
+public bool PropertyHasEmptySetBlock()
+{
+	return PropertyNode.AccessorList != null && PropertyNode.AccessorList.Accessors.Any(w => w.ExpressionBody == null && w.Body == null && w.Keyword.ToString() == "set");
+}
+
+public bool PropertyHasGetBlock() 
+{
+	return PropertyNode.AccessorList != null && PropertyNode.AccessorList.Accessors.Any(w => w.ExpressionBody == null && w.Body != null && w.Keyword.ToString() == "get");
+}
+
+public bool PropertyHasSetBlock()
+{
+	return PropertyNode.AccessorList != null && PropertyNode.AccessorList.Accessors.Any(w => w.ExpressionBody == null && w.Body != null && w.Keyword.ToString() == "set");
+}
+
+public bool PropertyHasAnyGetBlock() 
+{
+	return PropertyNode.ExpressionBody != null || (PropertyNode.AccessorList != null && PropertyNode.AccessorList.Accessors.Any(w => w.Keyword.ToString() == "get"));
+}
+
+public bool PropertyHasAnySetBlock() 
+{
+	return PropertyNode.AccessorList != null && PropertyNode.AccessorList.Accessors.Any(w => w.Keyword.ToString() == "set");
+}
+
+
+public string GetUniquePrivatePropertyName(ClassDeclarationSyntax classNode, string originalPropertyName)
+{
+	string propertyName = "_" + Regex.Replace(originalPropertyName, "^([A-Z])(.*)$", (m) => m.Groups[1].Value.ToLower() + m.Groups[2].Value);
+
+	string checkPropertyName = propertyName;
+
+	for (int i = 0; i < 1000; i++)
+	{
+		if (!classNode.Members.Any(w => w.IsKind(SyntaxKind.IdentifierName) && w.ToString() == checkPropertyName))
+			return checkPropertyName;
+
+		checkPropertyName = propertyName + i;
+	}
+
+	throw (new Exception($"Cannot find an unique property name for ${originalPropertyName}"));
+}
+
+public void EnsureUsing(string fullyQualifiedUsing) { 
+	if(!RequiredUsing.Contains(fullyQualifiedUsing))
+		RequiredUsing.Add(fullyQualifiedUsing);
+}
+
+
+public dynamic GetExtraTagWalker(string config = null) 
+{
+	return UniWalker.DataWalker.Parse(config ?? ExtraTag);
+}
+
+public Dictionary<string, string> ExtraTagAsDictionary(params char[] separators)
+{
+	var result = new Dictionary<string, string>();
+
+    if (String.IsNullOrEmpty(ExtraTag))
+        return result;
+
+    if (separators == null || separators.Length == 0)
+        separators = new[] { ',', ';', '|' };
+
+	foreach(string v in ExtraTag.Split(separators, StringSplitOptions.RemoveEmptyEntries))
+	{
+		int p = v.IndexOf('=');
+		if(p < 0)
+			result[v] = "";
+		else
+			result[v.Substring(0, p)] = v.Substring(p + 1);
+	}
+
+	return result;
+}
+
+public string GlobalSetting(string key)
+{
+	return GlobalTag.TryGetValue(key, out string value) ? value : null;
+}
+
+public JsonDocument ExtraTagAsJson()
+{
+	if(String.IsNullOrEmpty(ExtraTag))
+		return null;
+
+    var reader = new Utf8JsonReader(System.Text.Encoding.UTF8.GetBytes(ExtraTag.Replace("\\\"", "\"")));
+
+	if(JsonDocument.TryParseValue(ref reader, out JsonDocument document))
+		return document; 
+	
+	return null;
+}
+
+public static SyntaxNode AddWarningMessageTrivia(SyntaxNode node, string warningMessage)
+{
+    var warnTrivia = SyntaxFactory.Trivia(
+        SyntaxFactory.WarningDirectiveTrivia(SyntaxFactory.Token(SyntaxKind.HashToken),
+            SyntaxFactory.Token(SyntaxKind.WarningKeyword),
+            SyntaxFactory.Token(
+                SyntaxFactory.TriviaList(SyntaxFactory.PreprocessingMessage(@" " + warningMessage + "\r\n")),
+                SyntaxKind.EndOfDirectiveToken,
+                SyntaxFactory.TriviaList()),
+            true));
+
+    SyntaxTriviaList list = SyntaxFactory.TriviaList(warnTrivia);
+
+    SyntaxTriviaList existingLeadingTrivia = node.GetLeadingTrivia();
+    if (existingLeadingTrivia.Count > 0)
+        list = list.AddRange(existingLeadingTrivia);
+
+    return node.WithLeadingTrivia(list);
+}
+
+public static SyntaxNode AddErrorMessageTrivia(SyntaxNode node, string errorMessage)
+{
+    var errorTrivia = SyntaxFactory.Trivia(
+        SyntaxFactory.ErrorDirectiveTrivia(SyntaxFactory.Token(SyntaxKind.HashToken),
+            SyntaxFactory.Token(SyntaxKind.ErrorKeyword),
+            SyntaxFactory.Token(
+                SyntaxFactory.TriviaList(SyntaxFactory.PreprocessingMessage(@" " + errorMessage + "\r\n")),
+                SyntaxKind.EndOfDirectiveToken,
+                SyntaxFactory.TriviaList()),
+            true).WithLeadingTrivia(SyntaxFactory.EndOfLine("\r\n")));
+
+    SyntaxTriviaList list = SyntaxFactory.TriviaList(errorTrivia);
+
+    SyntaxTriviaList existingLeadingTrivia = node.GetLeadingTrivia();
+    if (existingLeadingTrivia.Count > 0)
+        list = list.AddRange(existingLeadingTrivia);
+
+    return node.WithLeadingTrivia(list);
+}
+
+public Dictionary<string, string> LoadResources(string resourceFilePath)
+{
+	string originalFilePath = resourceFilePath;
+
+	if(!System.IO.File.Exists(resourceFilePath))
+	{
+		resourceFilePath = System.IO.Path.GetDirectoryName(FilePath) + "/" + resourceFilePath;
+	}
+
+	if(!System.IO.File.Exists(resourceFilePath))
+		throw(new Exception($"Cannot find resource file at {originalFilePath}"));
+
+	var result = new Dictionary<string, string>();
+
+	var xmlDoc = new System.Xml.XmlDocument();
+	xmlDoc.LoadXml(System.IO.File.ReadAllText(resourceFilePath));
+
+	foreach(System.Xml.XmlElement element in xmlDoc.DocumentElement.SelectNodes( "/root/data" ))
+	{
+		result[ element.SelectSingleNode("value").InnerText ] = element.GetAttribute("name");
+	}
+
+	return result;
+}
+
+public static (string, List<ExpressionSyntax>) ConvertInterpolatedStringToFormat(InterpolatedStringExpressionSyntax s)
+{
+	string format = "";
+	var arguments = new List<ExpressionSyntax>();
+
+	int i = 0;
+
+	foreach(InterpolatedStringContentSyntax content in s.Contents)
+	{
+		if(content is InterpolatedStringTextSyntax)
+		{
+			format += ((InterpolatedStringTextSyntax)content).TextToken.ToFullString();
+		}
+		else if(content is InterpolationSyntax)
+		{
+			arguments.Add(((InterpolationSyntax)content).Expression);
+
+			format += "{" + i + "}";
+			i++;
+		}
+		else
+			throw(new Exception($"Unexpected type {content.GetType().ToString()}"));
+	}
+
+	return (format, arguments);
+}
+
+public SyntaxNode RewriteNodes<T>(SyntaxNode syntaxNode, Func<T, SyntaxNode> visitor) where T : CSharpSyntaxNode
+{
+    var rewriter = new NodeRewriter<T>(visitor);
+
+    return rewriter.Visit(syntaxNode);
+}
+
+public SyntaxNode RewriteLeafStatementNodes(SyntaxNode syntaxNode, Func<StatementSyntax, SyntaxNode> visitor)
+{
+	return RewriteNodes<StatementSyntax>(syntaxNode, (StatementSyntax node) =>
+			{
+				if(node.DescendantNodes().OfType<StatementSyntax>().Any()) // only end-level statements
+					return node;
+
+				return visitor(node);
+			});
+}
+
+
+public static MemberAccessExpressionSyntax CreateMemberAccess(string left, string right)
+{
+	return CreateMemberAccess(SyntaxFactory.IdentifierName(left), right);
+}
+
+public static MemberAccessExpressionSyntax CreateMemberAccess(ExpressionSyntax left, string right)
+{
+	return SyntaxFactory.MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, left, SyntaxFactory.IdentifierName(right));
+}
+
+
+public static LiteralExpressionSyntax CreateStringLiteral(string s)
+{
+	return SyntaxFactory.LiteralExpression(SyntaxKind.StringLiteralExpression, SyntaxFactory.Literal(s));	       
+}
+
+
+
+public static ExpressionSyntax CreateMemberAccessInvocation(string left, string right, params ExpressionSyntax[] args)
+{
+	return CreateMemberAccessInvocation(SyntaxFactory.IdentifierName(left), right, args);
+}
+
+public static ExpressionSyntax CreateMemberAccessInvocation(ExpressionSyntax left, string right, params ExpressionSyntax[] args)
+{
+	var memberAccess = CreateMemberAccess(left, right);
+	
+	if(args.Length > 0)
+	{
+		var arguments = new List<ArgumentSyntax>();
+		foreach(ExpressionSyntax arg in args)
+		{
+			arguments.Add(SyntaxFactory.Argument(arg));
+		}
+
+		var argumentList = SyntaxFactory.SeparatedList(arguments);
+
+		return  SyntaxFactory.InvocationExpression(memberAccess, SyntaxFactory.ArgumentList(argumentList));
+	}
+
+	 return SyntaxFactory.InvocationExpression(memberAccess);
+}
+
+public static ExpressionSyntax CreateMemberAccessInvocationNamedArgs(ExpressionSyntax left, string right, params (string, ExpressionSyntax)[] args)
+{
+	var memberAccess = CreateMemberAccess(left, right);
+	
+	if(args.Length > 0)
+	{
+		var arguments = new List<ArgumentSyntax>();
+		foreach((string argName, ExpressionSyntax argValue) in args)
+		{
+			ArgumentSyntax arg = SyntaxFactory.Argument(argValue);
+			
+			if(!String.IsNullOrEmpty(argName))
+			{
+				arg = arg.WithNameColon(SyntaxFactory.NameColon(SyntaxFactory.IdentifierName(argName)));
+			}
+
+			arguments.Add(arg);
+		}
+
+		var argumentList = SyntaxFactory.SeparatedList(arguments);
+
+		return  SyntaxFactory.InvocationExpression(memberAccess, SyntaxFactory.ArgumentList(argumentList));
+	}
+
+	 return SyntaxFactory.InvocationExpression(memberAccess);
+}
+
+
+public ElementAccessExpressionSyntax CreateElementAccess(string identifier, params ExpressionSyntax[] args)
+{
+	if(args.Length > 0)
+	{
+		var arguments = new List<ArgumentSyntax>();
+		foreach(ExpressionSyntax arg in args)
+		{
+			arguments.Add(SyntaxFactory.Argument(arg));
+		}
+
+		var argumentList = SyntaxFactory.SeparatedList(arguments);
+
+		return  SyntaxFactory.ElementAccessExpression(
+                            SyntaxFactory.IdentifierName(identifier),
+                            SyntaxFactory.BracketedArgumentList(argumentList));
+	}
+
+	 return SyntaxFactory.ElementAccessExpression(SyntaxFactory.IdentifierName(identifier));
+}
+
+
+public ObjectCreationExpressionSyntax CreateNewType(string typeName, params ExpressionSyntax[] args)
+{
+	var arguments = new List<ArgumentSyntax>();
+	foreach(ExpressionSyntax arg in args)
+	{
+		arguments.Add(SyntaxFactory.Argument(arg));
+	}
+
+	var argumentList = SyntaxFactory.SeparatedList(arguments);		
+
+	return SyntaxFactory.ObjectCreationExpression(SyntaxFactory.ParseTypeName(typeName)
+						.WithLeadingTrivia(SyntaxFactory.Whitespace(" ")))
+						.WithArgumentList( SyntaxFactory.ArgumentList(argumentList));
+		
+}
+
+public bool ImplementsBaseType(BaseTypeDeclarationSyntax node, params string[] types)
+{
+	if(node.BaseList == null)
+		return false;
+
+	foreach(BaseTypeSyntax baseType in node.BaseList.Types)
+	{
+		if(types.Any(w => w == baseType.ToString()))
+			return true;		
+
+		if(baseType.IsKind(SyntaxKind.IdentifierName))
+		{
+			string typeName = ((IdentifierNameSyntax)baseType.Type).Identifier.ToString();
+			if(types.Any(w => w == typeName))
+				return true;
+		}
+		else if(baseType.Type.IsKind(SyntaxKind.QualifiedName))
+		{
+			string typeName = ((QualifiedNameSyntax)baseType.Type).Right.Identifier.ToString();
+			if(types.Any(w => w == typeName))
+				return true;
+		}
+	}
+
+	return false;
+}
+
+public void StartNewFile(string fileName, string folder = null)
+{
+	this.Write($"\r\n// ##newfile {FileNameMarker} {folder}/{fileName}\r\n");
+}
+
+public T AddBaseTypes<T>(T node, params string[] typeNames) where T : BaseTypeDeclarationSyntax
+{
+    T result = node;
+
+	// we update base list using this approach becase the class may have some base declarations already
+
+    foreach (string typeName in typeNames)
+    {
+        result = result.AddBaseListTypes(SyntaxFactory.SimpleBaseType(SyntaxFactory.ParseTypeName(typeName))) as T;
+    }
+
+    result = result.WithBaseList(result.BaseList.WithColonToken(SyntaxFactory.Token(SyntaxFactory.TriviaList(), SyntaxKind.ColonToken, SyntaxFactory.TriviaList(SyntaxFactory.Space)))) as T;
+
+    if (result.Identifier.TrailingTrivia != null)
+        result = result.WithIdentifier(result.Identifier.ReplaceTrivia(result.Identifier.TrailingTrivia, (oldTrivia, newTrivia) => new SyntaxTrivia())) as T;
+
+    return result;
+}
+
+public string DefaultNamespace => GlobalSetting("namespace");
+
+// rewriter class
+public class NodeRewriter<T> : CSharpSyntaxRewriter where T : CSharpSyntaxNode
+{
+    private Func<T, SyntaxNode> _onVisit;
+
+    public NodeRewriter(Func<T, SyntaxNode> onVisit)
+    {
+        _onVisit = onVisit;
+    }
+
+    public override SyntaxNode Visit(SyntaxNode node)
+    {
+        node = base.Visit(node);
+
+        if (!(node is T))
+            return node;
+
+        return _onVisit(node as T);
+    }
+}
+
+#>

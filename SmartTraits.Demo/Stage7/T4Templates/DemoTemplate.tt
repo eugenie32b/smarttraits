@@ -1,0 +1,11 @@
+﻿<#@ include file="SmartTraitsCsharp.ttinclude" #>
+<#
+	// for this demo, we ignore empty nodes, but in real life you would want the template to fail, to be able to catch issues earlier
+	if(ClassNode?.Identifier == null)
+		return "";
+#>
+
+public string GetT4<#= ClassNode.Identifier.ToString() #>() 
+{
+	return "T4 <#= ClassNode.Identifier.ToString() #>"; 
+}
