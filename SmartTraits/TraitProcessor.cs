@@ -101,6 +101,7 @@ namespace SmartTraits
             if (!traitClass.BaseList.Types.Any())
                 sb.AppendLine("#warning base list types is empty");
 
+            ClassDeclarationSyntax parentClass = null;
             foreach (var baseListType in traitClass.BaseList.Types)
             {
                 TypeInfo typeInfo = ModelExtensions.GetTypeInfo(semanticModel, baseListType.Type);
@@ -114,7 +115,24 @@ namespace SmartTraits
                     continue;
                 }
 
-                if (baseTypeNode.Kind() != SyntaxKind.InterfaceDeclaration)
+                var nodeKind = baseTypeNode.Kind();
+                if (nodeKind == SyntaxKind.ClassDeclaration)
+                {
+                    if (parentClass is null && baseTypeNode is ClassDeclarationSyntax pc && pc.HasAttributeOfType(new[] { "Trait" }))
+                    {
+                        //AddProxy(parentClass, sb, semanticModel, namespaceNode, true);
+                        parentClass = pc;
+                        continue;
+                    }
+                    else
+                    {
+                        sb.AppendLine($"#error only interfaces and a parent Trait base type are allowed for Trait base types, but got {baseListType.Type}");
+                        continue;
+                    }
+                }
+                else
+                
+                if (nodeKind != SyntaxKind.InterfaceDeclaration)
                 {
                     sb.AppendLine($"#error only interfaces are allowed for Trait base types, but got {baseListType.Type}");
                     continue;

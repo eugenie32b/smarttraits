@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 
@@ -120,6 +121,15 @@ namespace SmartTraits
 
         public void Initialize(GeneratorInitializationContext context)
         {
+            /*
+#if DEBUG
+            if (!Debugger.IsAttached)
+            {
+                //Debugger.Launch();
+            }
+#endif 
+            Debug.WriteLine("Initalize code generator");
+            */
             context.RegisterForSyntaxNotifications(() => new SyntaxReceiver());
         }
 
