@@ -316,5 +316,5 @@ namespace SmartTraits
 
             generatedFiles.Add(generatedFileName);
         }
-\    }
+    }
 }
