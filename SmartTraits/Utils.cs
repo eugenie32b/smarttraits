@@ -288,15 +288,30 @@ namespace SmartTraits
             return memberNode;
         }
 
-        public static void AddToGeneratedSources(GeneratorExecutionContext context, HashSet<string> generatedFiles, MemberDeclarationSyntax memberNode, StringBuilder sb, string defaultFileName = "Common")
+        public static void AddToGeneratedSources(GeneratorExecutionContext context, HashSet<string> generatedFiles, MemberDeclarationSyntax memberNode, StringBuilder sb, string defaultFileName = "Common", AttributeSyntax addTraitAttr = null, SemanticModel semanticModel = null)
         {
             context.CancellationToken.ThrowIfCancellationRequested();
 
             string fileName = defaultFileName;
             if (memberNode != null)
                 fileName = Path.GetFileNameWithoutExtension(memberNode.SyntaxTree.FilePath);
+            if (semanticModel != null && addTraitAttr != null)
+            {
+                var firstParam = addTraitAttr.ArgumentList?.Arguments.FirstOrDefault();
+
+                var typeofTraitNode = firstParam?.DescendantNodes().OfType<TypeOfExpressionSyntax>().FirstOrDefault();
+                if (typeofTraitNode == null)
+                    return;
+
+                TypeInfo addTraitType = semanticModel.GetTypeInfo(typeofTraitNode.Type);
+                string traitClassName = addTraitType.Type?.ToDisplayString();
+                fileName = traitClassName + "." + fileName;
+            }
 
             string generatedFileName = Utils.GetUniqueFileName(generatedFiles, fileName);
+            var x = sb.ToString();
+            if (x.Contains("ExampleC"))
+                System.Diagnostics.Debug.WriteLine("Utils.");
             context.AddSource(generatedFileName, sb.ToString());
 
             generatedFiles.Add(generatedFileName);

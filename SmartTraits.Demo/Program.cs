@@ -16,6 +16,8 @@ namespace SmartTraits.Tests
 
             Stage4.Test.Example();
 
+            Stage4A.Test.Example();
+
             Stage5.Test.Example();
 
             Stage6.Test.Example();

@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 
@@ -64,14 +65,16 @@ namespace SmartTraits
 
                             StringBuilder processResult = AddTraitProcessor.ProcessAddTrait(context, generatedFiles, alreadyProcessedT4, T4Processor, addTraitAttr, semanticModel, destClass, alreadyProcessedTraits);
                             sb.Append(processResult);
+                            Utils.AddToGeneratedSources(context, generatedFiles, destClass, sb, addTraitAttr: addTraitAttr, semanticModel: semanticModel);
+                            sb = new StringBuilder();
                         }
                     }
                     else
                     {
                         sb.AppendLine($"#error in {destClass.Identifier}: to add a trait, the class must be defined as a partial");
+                        Utils.AddToGeneratedSources(context, generatedFiles, destClass, sb);
                     }
 
-                    Utils.AddToGeneratedSources(context, generatedFiles, destClass, sb);
                 }
 
                 foreach (MemberDeclarationSyntax memberCandidate in receiver.T4Candidates)
@@ -120,6 +123,15 @@ namespace SmartTraits
 
         public void Initialize(GeneratorInitializationContext context)
         {
+            /*
+#if DEBUG
+            if (!Debugger.IsAttached)
+            {
+                Debugger.Launch();
+            }
+#endif 
+            Debug.WriteLine("Initalize code generator");
+            */
             context.RegisterForSyntaxNotifications(() => new SyntaxReceiver());
         }
 
